@@ -1,0 +1,611 @@
+                                                                  WEEK-3
+	 	 	 	
+Week 3
+Design a sample topology using the NS2 Simulation Tool.
+# Create a simulator object
+set ns [new Simulator]
+# Define different colors
+# for data flows (for NAM)
+$ns color 1 Blue
+$ns color 2 Red
+# Open the NAM trace file
+set nf [open out.nam w]
+$ns namtrace-all $nf
+# Define a 'finish' procedure
+proc finish {} {
+global ns nf
+$ns flush-trace
+# Close the NAM trace file
+close $nf
+# Execute NAM on the trace file
+exec nam out.nam &
+exit 0
+}
+# Create four nodes
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+# Create links between the nodes
+$ns duplex-link $n0 $n2 2Mb 10ms DropTail
+$ns duplex-link $n1 $n2 2Mb 10ms DropTail
+$ns duplex-link $n2 $n3 1.7Mb 20ms DropTail
+# Set Queue Size of link (n2-n3) to 10
+$ns queue-limit $n2 $n3 10
+# Give node position (for NAM)
+$ns duplex-link-op $n0 $n2 orient right-down
+$ns duplex-link-op $n1 $n2 orient right-up
+$ns duplex-link-op $n2 $n3 orient right
+# Monitor the queue for link (n2-n3). (for NAM)
+$ns duplex-link-op $n2 $n3 queuePos 0.5
+# Setup a TCP connection
+set tcp [new Agent/TCP]
+$tcp set class_ 2
+$ns attach-agent $n0 $tcp
+set sink [new Agent/TCPSink]
+$ns attach-agent $n3 $sink
+$ns connect $tcp $sink
+$tcp set fid_ 1
+# Setup a FTP over TCP connection
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+$ftp set type_ FTP
+# Setup a UDP connection
+set udp [new Agent/UDP]
+$ns attach-agent $n1 $udp
+set null [new Agent/Null]
+$ns attach-agent $n3 $null
+$ns connect $udp $null
+$udp set fid_ 2
+# Setup a CBR over UDP connection
+set cbr [new Application/Traffic/CBR]
+$cbr attach-agent $udp
+$cbr set type_ CBR
+$cbr set packet_size_ 1000
+$cbr set rate_ 1mb
+$cbr set random_ false
+# Schedule events for the CBR and FTP agents
+$ns at 0.1 "$cbr start"
+$ns at 1.0 "$ftp start"
+$ns at 4.0 "$ftp stop"
+$ns at 4.5 "$cbr stop"
+# Detach tcp and sink agents
+# (not really necessary)
+$ns at 4.5 "$ns detach-agent $n0 $tcp ; $ns detach-agent $n3 $sink"
+# Call the finish procedure after
+# 5 seconds of simulation time
+$ns at 5.0 "finish"
+# Print CBR packet size and interval
+puts "CBR packet size = [$cbr set packet_size_]"
+puts "CBR interval = [$cbr set interval_]"
+# Run the simulation
+$ns run
+
+
+
+week-6
+implementation of stop and wait protocol
+set ns [new Simulator]
+set nf [open out.nam w]
+$ns namtrace-all $nf
+
+
+$ns color 1 Blue
+
+proc finish {} {
+	global ns nf
+	$ns flush-trace
+	close $nf
+	exec nam out.nam &
+	exit 0
+}
+
+
+
+
+set n0 [$ns node]
+set n1 [$ns node]
+$ns at 0.0 "$n0 label \"Sender\" "
+$ns at 0.0 "$n1 label \"Receiver\" "
+
+
+$ns duplex-link $n0 $n1 1Mb 200ms DropTail
+$ns duplex-link-op $n0 $n1 orient right
+
+
+set tcp [new Agent/TCP]
+set tcpsink [new Agent/TCPSink]
+$ns attach-agent $n0 $tcp
+$ns attach-agent $n1 $tcpsink
+$ns connect $tcp $tcpsink
+
+
+$tcp set fid_ 1
+$tcp set window_ 1
+$tcp set maxcwnd_ 1
+
+
+$ns add-agent-trace $tcp tcp
+$ns monitor-agent-trace $tcp
+
+
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+
+
+$ns at 0.5 "$ftp start"
+$ns at 3.0 "$ns detach-agent $n0 $tcp ; $ns detach-agent $n1 $tcpsink "
+$ns at 1.0 "$ns trace-annotate \"send packet 1\""
+$ns at 1.4 "$ns trace-annotate \"recieve ack 1\""
+$ns at 2.0 "$ns trace-annotate \"send packet 2\""
+$ns at 2.5 "$ns trace-annotate \"receive ack 2\""
+$ns at 3.2 "$ns trace-annotate \"send packet 3\""
+$ns at 3.5 "$ns trace-annotate \"receive ack 3\""
+$ns at 3.8 "$ns trace-annotate \"send packet 4\""
+$ns at 4.0 "finish"
+$ns run
+Week 5 & 6
+To create scenario for CSMA/CD using NS2 Simulation Tool.
+set ns [new Simulator] 
+set nf [open out.nam w] 
+
+$ns color 1 Blue 
+$ns color 2 Red 
+$ns namtrace-all $nf 
+
+proc finish {} { 
+    global ns nf 
+    $ns flush-trace 
+    close $nf 
+    exec nam out.nam & 
+    exit 0 
+} 
+
+set n0 [$ns node] 
+set n1 [$ns node] 
+set n2 [$ns node] 
+set n3 [$ns node] 
+set n4 [$ns node] 
+set n5 [$ns node] 
+
+$n1 color red 
+$n1 shape box
+
+$ns duplex-link $n0 $n2 2Mb 10ms DropTail 
+$ns duplex-link $n1 $n2 2Mb 10ms DropTail 
+
+$ns duplex-link $n2 $n3 0.3Mb 100ms DropTail 
+
+LanRouter set debug_ 0
+$ns newLan "$n3 $n4 $n5" 0.5Mb 40ms LL Queue/DropTail MAC/Csma/Cd Channel
+
+#Setup a TCP connection 
+set tcp [new Agent/TCP/Newreno] 
+set sink [new Agent/TCPSink/DelAck] 
+$ns attach-agent $n0 $tcp 
+$ns attach-agent $n4 $sink 
+$ns connect $tcp $sink 
+
+$tcp set fid_ 1 
+$tcp set window_ 8000 
+$tcp set packetSize_ 552 
+
+#Setup a FTP over TCP connection 
+set ftp [new Application/FTP] 
+$ftp attach-agent $tcp 
+$ftp set type_ FTP 
+
+#Setup a UDP connection 
+set udp [new Agent/UDP] 
+set null [new Agent/Null] 
+$ns attach-agent $n1 $udp 
+$ns attach-agent $n5 $null 
+$ns connect $udp $null 
+$udp set fid_ 2 
+
+#Setup a CBR over UDP connection 
+set cbr [new Application/Traffic/CBR] 
+$cbr attach-agent $udp 
+$cbr set type_ CBR 
+$cbr set packet_size_ 1000 
+$cbr set rate_ 0.01mb 
+$cbr set random_ false 
+
+$ns at 0.1 "$cbr start" 
+$ns at 1.0 "$ftp start" 
+$ns at 124.0 "$ftp stop" 
+$ns at 124.5 "$cbr stop" 
+$ns at 125.0 "finish" 
+
+$ns run
+
+
+
+
+
+
+
+
+Implementation of goback-N protocol and selective repeat protocol using NS2 Simulation Tool. 
+goback-N protocol
+#send packets one by one
+set ns [new Simulator]
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+
+$n0 color "purple"
+$n1 color "purple"
+$n2 color "violet"
+$n3 color "violet"
+$n4 color "chocolate"
+$n5 color "chocolate"
+
+$n0 shape box ;
+$n1 shape box ;
+$n2 shape box ;
+$n3 shape box ;
+$n4 shape box ;
+$n5 shape box ;
+
+$ns at 0.0 "$n0 label SYS0"
+$ns at 0.0 "$n1 label SYS1"
+$ns at 0.0 "$n2 label SYS2"
+$ns at 0.0 "$n3 label SYS3"
+$ns at 0.0 "$n4 label SYS4"
+$ns at 0.0 "$n5 label SYS5"
+
+set nf [open goback.nam w]
+$ns namtrace-all $nf
+set f [open goback.tr w]
+$ns trace-all $f
+
+$ns duplex-link $n0 $n2 1Mb 20ms DropTail
+$ns duplex-link $n1 $n2 1Mb 20ms DropTail
+$ns duplex-link $n2 $n3 1Mb 20ms DropTail
+$ns duplex-link $n3 $n4 1Mb 20ms DropTail
+$ns duplex-link $n3 $n5 1Mb 20ms DropTail
+
+$ns duplex-link-op $n0 $n2 orient right-down
+$ns duplex-link-op $n1 $n2 orient right-up
+$ns duplex-link-op $n2 $n3 orient right
+$ns duplex-link-op $n3 $n4 orient right-up
+$ns duplex-link-op $n3 $n5 orient right-down
+$ns queue-limit $n0 $n2 5
+
+Agent/TCP set_nam_tracevar_true
+
+set tcp [new Agent/TCP]
+set sink [new Agent/TCPSink]
+$ns attach-agent $n1 $tcp
+$ns attach-agent $n4 $sink
+$ns connect $tcp $sink
+$tcp set fid 1
+
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+
+$ns at 0.05 "$ftp start"
+$ns at 0.06 "$tcp set windowlnit 6"
+$ns at 0.06 "$tcp set maxcwnd 6"
+$ns at 0.25 "$ns queue-limit $n3 $n4 0"
+$ns at 0.26 "$ns queue-limit $n3 $n4 10"
+$ns at 0.305 "$tcp set windowlnit 4"
+$ns at 0.305 "$tcp set maxcwnd 4"
+$ns at 0.368 "$ns detach-agent $n1 $tcp ; $ns detach-agent $n4 $sink"
+$ns at 1.5 "finish"
+
+proc finish {} {
+    global ns nf
+    $ns flush-trace
+    close $nf
+    exec nam goback.nam &
+    exit 0
+}
+
+$ns run
+
+
+
+
+
+
+selective repeat protocol 
+#send packets one by one
+set ns [new Simulator]
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+
+$n0 color "red"
+$n1 color "red"
+$n2 color "green"
+$n3 color "green"
+$n4 color "black"
+$n5 color "black"
+
+$ns at 0.0 "$n0 label SYS1"
+$ns at 0.0 "$n1 label SYS2"
+$ns at 0.0 "$n2 label SYS3"
+$ns at 0.0 "$n3 label SYS4"
+$ns at 0.0 "$n4 label SYS5"
+$ns at 0.0 "$n5 label SYS6"
+
+set nf [open Srepeat.nam w]
+$ns namtrace-all $nf
+
+$ns duplex-link $n0 $n2 1Mb 10ms DropTail
+$ns duplex-link $n1 $n2 1Mb 10ms DropTail
+$ns duplex-link $n2 $n3 1Mb 10ms DropTail
+$ns duplex-link $n3 $n4 1Mb 10ms DropTail
+$ns duplex-link $n3 $n5 1Mb 10ms DropTail
+
+$ns duplex-link-op $n0 $n2 orient right-down
+$ns duplex-link-op $n1 $n2 orient right-up
+$ns duplex-link-op $n2 $n3 orient right
+$ns duplex-link-op $n3 $n4 orient right-up
+$ns duplex-link-op $n3 $n5 orient right-down
+$ns queue-limit $n0 $n2 5
+
+Agent/TCP set_nam_tracevar_true
+set tcp [new Agent/TCP]
+set sink [new Agent/TCPSink]
+$ns attach-agent $n1 $tcp
+$ns attach-agent $n4 $sink
+$ns connect $tcp $sink
+$tcp set fid 1
+
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp
+
+$ns at 0.05 "$ftp start"
+$ns at 0.06 "$tcp set windowlnit 8"
+$ns at 0.06 "$tcp set maxcwnd 8"
+$ns at 0.25 "$ns queue-limit $n3 $n4 0"
+$ns at 0.26 "$ns queue-limit $n3 $n4 10"
+$ns at 0.30 "$tcp set windowlnit 1"
+$ns at 0.30 "$tcp set maxcwnd 1"
+$ns at 0.30 "$ns queue-limit $n3 $n4 10" 
+$ns at 0.47 "$ns detach-agent $n1 $tcp;$ns detach-agent $n4 $sink"
+$ns at 1.75 "finish"
+
+proc finish {} {
+    global ns nf
+    $ns flush-trace
+    close $nf
+    exec nam Srepeat.nam &
+    exit 0
+}
+
+$ns run
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Hamming code
+/*Problem defination: Write a program to find Hamming code of given data bits. 
+If one of the Hamming code bit is corrupted then find error bit location and correct error accordingly*/
+
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<math.h>
+
+void main()
+{
+    int maxp=6;
+    int a[50],temp[70],temp2[70];
+    int t,i,j,k,nd,n,nh,sum=0,pos=0;
+
+    printf("Enter Length of Data String: ");
+    scanf("%d",&nd);
+    printf("Enter Data String: ");
+    for(i=0;i<nd;i++)
+    {
+        scanf("%d",&a[i]);
+    }
+    printf("-----------------------------------\n",nd);
+    for(i=0,j=0;i<nd;i++)
+    {
+        for(k=0;k<maxp;k++)
+        {
+            t=pow(2,k)-1;
+            if(j==t)
+            {
+                temp[j]=0;
+                j++;
+            }
+        }
+        temp[j]=a[i];
+        j++;
+    }
+    nh=j;
+    printf("Length of Hamming code: %d bits\n",nh);
+    n=nh-nd;
+    printf("Number of Parity Bits: %d \n",n);
+
+    int b[n];
+    int m=n-1;
+    for(k=0;k<n;k++)
+    {
+        t=pow(2,k)-1;
+
+        for(i=t;i<nh;)
+        {
+            for(j=0;j<=t;j++)
+            {
+                sum=sum+temp[i];
+                i++;
+                if(i>=nh)
+                    break;
+            }
+
+            if(i>=nh)
+                break;
+
+            for(j=0;j<=t;j++)
+            {
+                i++;
+                if(i>=nh)
+                    break;
+            }
+
+            if(i>=nh)
+                break;
+        }
+        temp[t]=sum%2;
+        sum=0;
+        printf("P%d: %d\n",t+1,temp[t]);
+    }
+
+
+    printf("\nHamming code: Sender side:   ");
+    for(i=0;i<nh;i++)
+    {
+        printf("%d ",temp[i]);
+    }
+
+
+    printf("\nHamming code: Receiver side: ");
+    for(i=0;i<nh;i++)
+    {
+        scanf("%d",&temp2[i]);
+    }
+    sum=0;
+    for(k=0;k<n;k++)
+    {
+        t=pow(2,k)-1;
+
+        for(i=t;i<nh;)
+        {
+            for(j=0;j<=t;j++)
+            {
+                sum=sum+temp2[i];
+                i++;
+                if(i>=nh)
+                    break;
+            }
+
+            if(i>=nh)
+                break;
+
+            for(j=0;j<=t;j++)
+            {
+                i++;
+                if(i>=nh)
+                    break;
+            }
+
+            if(i>=nh)
+                break;
+        }
+        b[m]=sum%2;
+        sum=0;
+        printf("P%d: %d\n",t+1,b[m]);
+        m--;
+    }
+    for(m=0;m<n;m++)
+    {
+        pos=pos+b[n-m-1]*pow(2,m);
+    }
+    printf("Position of Error: %d\n",pos);
+    if(temp2[pos-1]==0)
+        temp2[pos-1]=1;
+    else
+        temp2[pos-1]=0;
+
+    printf("\nHamming code: Receiver side: Error Corrected:  ");
+    for(i=0;i<nh;i++)
+    {
+        printf("%d ",temp2[i]);
+    }
+
+    printf("\n-----------------------------------\n",nd);
+}
+
+CRC code
+
+#include<stdio.h>
+#include<string.h>
+#define N strlen(gen_poly)
+char data[28];
+char check_value[28];
+char gen_poly[10];
+int data_length,i,j;
+void XOR(){
+    for(j = 1;j < N; j++)
+    check_value[j] = (( check_value[j] == gen_poly[j])?'0':'1');
+    
+}
+void receiver(){
+    printf("Enter the received data: ");
+    scanf("%s", data);
+    printf("\n-----------------------------\n");
+    printf("Data received: %s", data);
+    crc();
+    for(i=0;(i<N-1) && (check_value[i]!='1');i++);
+        if(i<N-1)
+            printf("\nError detected\n\n");
+        else
+            printf("\nNo error detected\n\n");
+}
+
+void crc(){
+    for(i=0;i<N;i++)
+        check_value[i]=data[i];
+    do{
+        if(check_value[0]=='1')
+            XOR();
+        for(j=0;j<N-1;j++)
+            check_value[j]=check_value[j+1];
+        check_value[j]=data[i++];
+    }while(i<=data_length+N-1);
+}
+
+int main()
+{
+    printf("\nEnter data to be transmitted: ");
+    scanf("%s",data);
+    printf("\n Enter the Generating polynomial: ");
+    scanf("%s",gen_poly);
+    data_length=strlen(data);
+    for(i=data_length;i<data_length+N-1;i++)
+        data[i]='0';
+    printf("\n----------------------------------------");
+    printf("\n Data padded with n-1 zeros : %s",data);
+    printf("\n----------------------------------------");
+    crc();
+    printf("\nCRC or Check value is : %s",check_value);
+    for(i=data_length;i<data_length+N-1;i++)
+        data[i]=check_value[i-data_length];
+    printf("\n----------------------------------------");
+    printf("\n Final data to be sent : %s",data);
+    printf("\n----------------------------------------\n");
+    receiver();
+        return 0;
+}
